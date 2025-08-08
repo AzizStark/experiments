@@ -15,7 +15,7 @@ def test_imports():
         print("✅ Standard library imports successful")
         
         # Test if we can import our modules
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         
         try:
             from config import Config

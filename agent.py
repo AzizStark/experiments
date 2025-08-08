@@ -7,7 +7,7 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from providers import LMStudioProvider
 from config import Config
-from tools import get_weather
+from tools import launch_browser, close_browser, get_browser_status
 import logging
 from typing import List, Dict, Any
 import uuid
@@ -28,7 +28,7 @@ class LangChainAgent:
         self.llm = provider.get_llm()
         
         # Initialize tools
-        self.tools = [get_weather]
+        self.tools = [launch_browser, close_browser, get_browser_status]
         
         # Initialize memory for conversation persistence
         self.memory = MemorySaver()
@@ -36,12 +36,19 @@ class LangChainAgent:
         
         # System prompt for the agent with tool guidance
         self.system_prompt = f"""You are {Config.AGENT_NAME}, a helpful AI assistant powered by LangChain.
-You are running locally through LM Studio and have access to tools to help answer questions.
+You are running locally through LM Studio and have access to browser automation tools.
 
 Available tools:
-- get_weather: Get current weather information for any location
+- launch_browser: Launch a stealth browser and optionally navigate to a URL (kills any existing browser)
+- close_browser: Close the current browser session completely (terminates process)
+- get_browser_status: Get status of the active browser session
 
-When users ask about weather, use the get_weather tool to provide accurate information.
+Browser automation features:
+- Single session architecture - only one browser can be active at a time
+- Process termination - closing browser actually kills the process
+- Screenshots are automatically taken for verification
+- Stealth browsing - undetectable by most anti-bot systems
+
 Always be conversational, helpful, and concise in your responses.
 If you don't have the right tool for a task, explain what you can and cannot do."""
         

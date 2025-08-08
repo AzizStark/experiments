@@ -3,7 +3,12 @@
 import logging
 import sys
 from typing import Optional
-from agent import LangChainAgent
+try:
+    from agent import LangChainAgent
+    LANGGRAPH_AVAILABLE = True
+except ImportError:
+    from agent_simple import SimpleLangChainAgent as LangChainAgent
+    LANGGRAPH_AVAILABLE = False
 from providers import LMStudioProvider
 from config import Config
 
@@ -111,6 +116,8 @@ def main():
                     print(f"  Model: {info['provider']['model']}")
                     print(f"  Base URL: {info['provider']['base_url']}")
                     print(f"  Memory Size: {info['memory_size']} messages")
+                    if 'tools' in info:
+                        print(f"  Available Tools: {', '.join(info['tools'])}")
                     print()
                     continue
                 

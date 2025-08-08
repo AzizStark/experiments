@@ -4,10 +4,11 @@ A simple, extensible LangChain agent that works with LM Studio for local AI conv
 
 ## Features
 
-- 🤖 **Simple Conversational Agent** - Basic chat interface with memory
+- 🤖 **Tool-Enabled Agent** - ReAct agent with weather tool support
 - 🏠 **Local AI with LM Studio** - No API keys required for local models
-- 💾 **Conversation Memory** - Remembers last 10 exchanges for context
-- 🔧 **Extensible Architecture** - Easy to add new providers and features
+- 🛠️ **Weather Tool** - Get weather information for any location
+- 💾 **Conversation Memory** - Persistent memory across conversations
+- 🔧 **Extensible Architecture** - Easy to add new providers and tools
 - 📝 **Logging Support** - Comprehensive logging for debugging
 - 🎯 **CLI Interface** - Simple command-line chat interface
 
@@ -75,8 +76,19 @@ Powered by LangChain + LM Studio
 You: Hello! How are you?
 Agent: Hello! I'm doing well, thank you for asking. I'm your AI assistant running locally through LM Studio and powered by LangChain. How can I help you today?
 
-You: What's the weather like?
-Agent: I don't have access to real-time weather data since I'm running locally without internet access. To get current weather information, you'd need to check a weather website, app, or ask a voice assistant with internet connectivity. Is there anything else I can help you with?
+You: What's the weather in New York?
+Agent: 🌤️ Weather in New York:
+• Condition: Partly Cloudy
+• Temperature: 22°C
+• Humidity: 65%
+• Wind Speed: 12 km/h
+
+You: How about London in fahrenheit?
+Agent: 🌤️ Weather in London:
+• Condition: Cloudy
+• Temperature: 68°F
+• Humidity: 78%
+• Wind Speed: 8 km/h
 
 You: /info
 📊 Agent Information:
@@ -84,7 +96,8 @@ You: /info
   Provider: LM Studio
   Model: local-model
   Base URL: http://localhost:1234/v1
-  Memory Size: 4 messages
+  Memory Size: 6 messages
+  Available Tools: get_weather
 ```
 
 ## Project Structure
@@ -99,6 +112,9 @@ langchain-agent/
 ├── providers/             # Model providers (extensible)
 │   ├── __init__.py
 │   └── lm_studio.py       # LM Studio provider
+├── tools/                 # Agent tools
+│   ├── __init__.py
+│   └── weather.py         # Weather tool implementation
 └── README.md              # This file
 ```
 

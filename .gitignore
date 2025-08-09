@@ -3,3 +3,4 @@ __pycache__
 .env
 agent.log
 screenshots
+/browser-service/node_modules

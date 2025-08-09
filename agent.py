@@ -7,7 +7,14 @@ from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 from providers import LMStudioProvider
 from config import Config
-from tools import launch_browser, close_browser, get_browser_status
+from tools import (
+    launch_browser, 
+    close_browser, 
+    get_browser_status, 
+    analyze_screen,
+    navigate_to_url,
+    take_marked_screenshot
+)
 import logging
 from typing import List, Dict, Any
 import uuid
@@ -27,8 +34,15 @@ class LangChainAgent:
         self.provider = provider
         self.llm = provider.get_llm()
         
-        # Initialize tools
-        self.tools = [launch_browser, close_browser, get_browser_status]
+        # Initialize tools (Enterprise browser service)
+        self.tools = [
+            launch_browser, 
+            close_browser, 
+            get_browser_status, 
+            analyze_screen,
+            navigate_to_url,
+            take_marked_screenshot
+        ]
         
         # Initialize memory for conversation persistence
         self.memory = MemorySaver()
@@ -36,21 +50,33 @@ class LangChainAgent:
         
         # System prompt for the agent with tool guidance
         self.system_prompt = f"""You are {Config.AGENT_NAME}, a helpful AI assistant powered by LangChain.
-You are running locally through LM Studio and have access to browser automation tools.
+You are running locally through LM Studio and have access to advanced browser automation and vision analysis tools.
 
 Available tools:
-- launch_browser: Launch a stealth browser and optionally navigate to a URL (kills any existing browser)
-- close_browser: Close the current browser session completely (terminates process)
+- launch_browser: Launch a browser and navigate to a URL with enterprise-grade reliability
+- close_browser: Close the current browser session
 - get_browser_status: Get status of the active browser session
+- analyze_screen: Take a screenshot for vision analysis (your key capability!)
+- navigate_to_url: Navigate to a new URL in the current session
+- take_marked_screenshot: Take screenshot with interactive elements highlighted
 
 Browser automation features:
-- Single session architecture - only one browser can be active at a time
-- Process termination - closing browser actually kills the process
-- Screenshots are automatically taken for verification
-- Stealth browsing - undetectable by most anti-bot systems
+- Enterprise-grade browser service architecture
+- Session-based management with unique session IDs
+- 100% reliable screenshot capture using @presidio-dev/playwright-core
+- Vision analysis capabilities - you can see and describe web content
+- Element detection and highlighting for better interaction
+- LLM-optimized design specifically for AI browser control
 
-Always be conversational, helpful, and concise in your responses.
-If you don't have the right tool for a task, explain what you can and cannot do."""
+Vision Analysis Capabilities:
+When users ask "What do you see on the screen?" or similar questions, use analyze_screen to:
+1. Capture a screenshot of the current browser content
+2. Analyze the visual content using your vision capabilities
+3. Describe what you see in detail - text, images, layout, interactive elements
+4. Help users navigate and interact with web content
+
+Always be conversational, helpful, and make full use of your vision capabilities when appropriate.
+The browser service must be running on localhost:3000 for tools to work."""
         
         # Create the ReAct agent with tools
         self.agent = create_react_agent(

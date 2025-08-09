@@ -1,0 +1,9 @@
+1. launch a browser
+2. navigate to https://saucedemo.com/
+3. find and click on the username text placeholder
+4. then type standard_user as username
+5. find and click the password input field
+6. then type secret_sauce as password
+7. find and click the login button
+8. find and click the "add to cart" button
+9. find and click the shopping cart icon at the top right

@@ -7,7 +7,8 @@ from .browser import (
     analyze_screen,
     navigate_to_url,
     click,
-    type_text
+    type_text,
+    find_and_click
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "navigate_to_url",
     "click",
     "type_text",
+    "find_and_click",
 ]

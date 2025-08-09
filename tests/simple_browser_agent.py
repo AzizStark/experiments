@@ -18,12 +18,12 @@ from langgraph.checkpoint.memory import InMemorySaver
 from tools.browser_vision_tools import (
     launch,
     navigate,
-    click,
     type_text,
     scroll,
     look,
     close,
     status,
+    find_and_click,
     check_health
 )
 
@@ -43,7 +43,7 @@ class SimpleBrowserAgent:
     def _initialize_llm(self) -> ChatOpenAI:
         """Initialize the language model."""
         return ChatOpenAI(
-            base_url="http://localhost:1234/v1",
+            base_url="http://172.19.100.163:1234/v1",
             api_key="lm-studio",
             model=self.model_name,
             temperature=0.1
@@ -54,12 +54,12 @@ class SimpleBrowserAgent:
         return [
             launch,
             navigate, 
-            click,
             type_text,
             scroll,
             look,
             close,
-            status
+            status,
+            find_and_click
         ]
     
     def _create_agent(self):
@@ -70,7 +70,7 @@ class SimpleBrowserAgent:
 Available tools:
 - launch(url): Launch browser and go to URL (always use this first)
 - navigate(url): Navigate to a new URL  
-- click(x, y): Click at coordinates x,y
+- find_and_click(element_description): Find an element by description and click it using AI vision
 - type_text(text): Type text into focused element
 - scroll(direction, amount): Scroll page ('up' or 'down', amount=steps)
 - look(): Take screenshot and analyze current screen
@@ -78,10 +78,10 @@ Available tools:
 - close(): Close browser session
 
 Key features:
-- After EVERY action (launch, navigate, click, type, scroll), you automatically get vision analysis
+- After EVERY action (launch, navigate, find_and_click, type, scroll), you automatically get vision analysis
 - You can see what changed, what's on screen, and what interactive elements are available
 - Use this visual feedback to guide your next actions
-- Coordinates for clicking: screen is typically 900x600, click in center of elements
+- find_and_click uses AI vision (Moondream) to find elements by natural language description
 - Always launch() first before any other actions
 
 Instructions:
@@ -89,7 +89,11 @@ Instructions:
 2. Use launch() to start
 3. After each action, read the vision analysis carefully  
 4. Use the visual feedback to decide next steps
-5. Look for submit buttons to click rather than using keyboard shortcuts
+5. For find_and_click, use clear descriptions like:
+   - "username input"
+   - "blue login button"
+   - "search box at top of page"
+   - "shopping cart icon in top right"
 6. Be specific about what you're trying to accomplish
 7. Close browser when task is complete
 
@@ -157,21 +161,26 @@ def test_amazon_navigation():
     health = agent.check_health()
     print(f"Browser Service: {'✅' if health['browser_service']['healthy'] else '❌'}")
     print(f"Vision Model: {'✅' if health['vision_model']['healthy'] else '❌'}")
+    print(f"Moondream: {'✅' if health['moondream']['healthy'] else '❌'}")
     
     if not health['overall_healthy']:
         print("⚠️ System not ready. Please ensure:")
         print("1. Browser service: cd browser-service && npm start")
         print("2. LM Studio with Qwen-2.5-VL on localhost:1234")
+        print("3. Moondream server on localhost:2020")
         return False
     
     print("\n🚀 System ready! Starting browser task...")
     
-    task = """1. Navigate to saucedemo.com
-2. find the username input and click on it at coordinates {"x":639,"y":176}
-3. then type standard_user as username
-4. find password input and click on it at coordinates {"x":640,"y":228}
-5. then type secret_sauce as password
-6. then click on submit button at  (640, 328)"""
+    task = """1. launch a browser
+2. navigate to https://saucedemo.com/
+3. find and click on the username text placeholder
+4. then type standard_user as username
+5. find and click the password input field
+6. then type secret_sauce as password
+7. find and click the login button
+8. in the product page, find and click the "add to cart" button for the Sauce Labs Backpack
+9. find and click the shopping cart icon at the top right"""
 
     print(f"\n📋 Task: {task}")
     print("\n" + "="*60)
@@ -294,20 +303,27 @@ def main():
     
     if successful_tests > 0:
         print("\n💡 Simple Browser Agent Features:")
-        print("✅ CLI-style tool names (launch, navigate, click, type, scroll)")
+        print("✅ CLI-style tool names (launch, navigate, find_and_click, type, scroll)")
         print("✅ Automatic vision analysis after every action")
         print("✅ Visual feedback guides next actions")
         print("✅ Simple ReAct pattern implementation")
         print("✅ Easy to use for local models")
+        print("✅ NEW: Moondream integration for natural language element finding!")
         
         print("\n🚀 Usage Example:")
         print("agent = SimpleBrowserAgent()")
         print('result = agent.run_task("Go to amazon.com and find the search box")')
         
+        print("\n🎯 Moondream Features:")
+        print("• find_and_click('username input field')")
+        print("• find_and_click('blue login button')")
+        print("• find_and_click('shopping cart icon at top right')")
+        
     else:
         print("\n⚠️ Tests failed. Check setup:")  
         print("1. Browser service: cd browser-service && npm start")
         print("2. LM Studio with Qwen-2.5-VL on localhost:1234")
+        print("3. Moondream server on localhost:2020")
 
 if __name__ == "__main__":
     main()

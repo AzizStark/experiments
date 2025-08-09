@@ -14,7 +14,8 @@ from tools import (
     analyze_screen,
     navigate_to_url,
     click,
-    type_text
+    type_text,
+    find_and_click
 )
 import logging
 from typing import List, Dict, Any
@@ -43,7 +44,8 @@ class LangChainAgent:
             analyze_screen,
             navigate_to_url,
             click,
-            type_text
+            type_text,
+            find_and_click
         ]
         
         # Initialize memory for conversation persistence
@@ -67,6 +69,7 @@ Available tools:
 - navigate_to_url: Navigate to a new URL in the current session
 - click: Click at specific coordinates on the page
 - type_text: Type text into the currently focused element
+- find_and_click: Find an element by description and click it (uses AI vision to locate elements)
 
 Browser automation features:
 - Enterprise-grade browser service architecture
@@ -75,6 +78,8 @@ Browser automation features:
 - Vision analysis capabilities - you can see and describe web content
 - Interactive element clicking with precise coordinate control
 - Text input capabilities for form filling and search
+- AI-powered element detection using Moondream vision model
+- Natural language element finding - describe what to click!
 - LLM-optimized design specifically for AI browser control
 
 Vision Analysis Capabilities:
@@ -90,10 +95,27 @@ Browser Interaction Workflow:
 3. Always use ONE tool per response - never chain tools together
 4. If user requests multiple actions, explain you'll do them step by step
 
+Using find_and_click for Natural Language Element Finding:
+When users ask to click on elements by description, use find_and_click with clear descriptions:
+- "find_and_click('search box at top of page')"
+- "find_and_click('blue login button')"
+- "find_and_click('shopping cart icon in top right')"
+- "find_and_click('username input field')"
+
+Tips for element descriptions:
+- Be specific: include color, text, position, or unique features
+- Mention location: "at top", "in the center", "bottom right"
+- Include text if visible: "button with text 'Submit'"
+- Describe visual appearance: "red circular icon", "large blue button"
+
 Examples:
 User: "click at 400,200 and type hello"
 Correct: Use click tool only, then say "Click completed. Would you like me to type 'hello' now?"
 Incorrect: Try to use both click and type_text in one response
+
+User: "click the login button"
+Correct: Use find_and_click("login button") - let Moondream find it!
+Incorrect: Guess coordinates like click(500, 300)
 
 Always be conversational, helpful, and make full use of your vision capabilities when appropriate.
 The browser service must be running on localhost:3000 for tools to work."""

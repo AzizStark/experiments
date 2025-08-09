@@ -11,6 +11,9 @@ import requests
 import logging
 import time
 import base64
+from PIL import Image
+import io
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +21,29 @@ logger = logging.getLogger(__name__)
 BROWSER_SERVICE_URL = "http://localhost:3000"
 BROWSER_SERVICE_TIMEOUT = 30
 
+# Moondream configuration
+MOONDREAM_MODE = os.getenv("MOONDREAM_MODE", "local")  # "local" or "cloud"
+MOONDREAM_API_KEY = os.getenv("MOONDREAM_API_KEY", "")
+MOONDREAM_LOCAL_URL = os.getenv("MOONDREAM_LOCAL_URL", "http://localhost:2020/v1")
+MOONDREAM_TIMEOUT = 30
+
+# Import moondream for cloud mode
+if MOONDREAM_MODE == "cloud":
+    try:
+        import moondream as md
+    except ImportError:
+        logger.error("Moondream package not installed. Please run: pip install moondream")
+        md = None
+
 # Global session tracking
 current_session_id: Optional[str] = None
 
 class BrowserError(Exception):
     """Exception raised when browser operations fail."""
+    pass
+
+class MoondreamError(Exception):
+    """Exception raised when Moondream operations fail."""
     pass
 
 def _make_request(endpoint: str, data: Dict[str, Any] = None, method: str = "POST") -> Dict[str, Any]:
@@ -89,6 +110,148 @@ Be specific about what you observe so I can plan the next action."""
         
     except Exception as e:
         return f"❌ Vision analysis failed: {str(e)}"
+
+def _encode_image_to_base64(image_data: bytes) -> str:
+    """Encode image bytes to base64 string for Moondream API."""
+    encoded = base64.b64encode(image_data).decode('utf-8')
+    return f"data:image/png;base64,{encoded}"
+
+def _find_element_coordinates_local(element_description: str, image: Image.Image, image_bytes: bytes) -> Optional[Dict[str, int]]:
+    """Use local Moondream server to find element coordinates."""
+    width, height = image.size
+    
+    try:
+        # Prepare Moondream request
+        moondream_data = {
+            "image_url": _encode_image_to_base64(image_bytes),
+            "object": element_description
+        }
+        
+        # Send to Moondream pointing endpoint
+        logger.info(f"Sending to local Moondream: {element_description}")
+        response = requests.post(
+            f"{MOONDREAM_LOCAL_URL}/point",
+            json=moondream_data,
+            timeout=MOONDREAM_TIMEOUT
+        )
+        
+        if response.status_code != 200:
+            raise MoondreamError(f"Moondream API error: {response.status_code}")
+        
+        result = response.json()
+        
+        # Process coordinates
+        if "points" in result and result["points"]:
+            point = result["points"][0]  # Take first point
+            
+            # Convert normalized coordinates to pixels
+            norm_x = point.get("x", 0)
+            norm_y = point.get("y", 0)
+            pixel_x = int(norm_x * width)
+            pixel_y = int(norm_y * height)
+            
+            logger.info(f"Found element at: ({pixel_x}, {pixel_y})")
+            
+            return {
+                "x": pixel_x,
+                "y": pixel_y,
+                "normalized_x": norm_x,
+                "normalized_y": norm_y,
+                "width": width,
+                "height": height
+            }
+        else:
+            logger.warning(f"Moondream could not find: {element_description}")
+            return None
+            
+    except requests.exceptions.ConnectionError:
+        raise MoondreamError(f"Cannot connect to Moondream server at {MOONDREAM_LOCAL_URL}")
+    except Exception as e:
+        raise MoondreamError(f"Local element detection failed: {str(e)}")
+
+def _find_element_coordinates_cloud(element_description: str, image: Image.Image) -> Optional[Dict[str, int]]:
+    """Use Moondream cloud API to find element coordinates."""
+    if not MOONDREAM_API_KEY:
+        raise MoondreamError("MOONDREAM_API_KEY environment variable not set for cloud mode")
+    
+    if md is None:
+        raise MoondreamError("Moondream package not installed. Please run: pip install moondream")
+    
+    width, height = image.size
+    
+    try:
+        # Initialize Moondream with API key
+        model = md.vl(api_key=MOONDREAM_API_KEY)
+        
+        # Find element using cloud API
+        logger.info(f"Sending to Moondream cloud: {element_description}")
+        result = model.point(image, element_description)
+        
+        # Process coordinates
+        if "points" in result and result["points"]:
+            point = result["points"][0]  # Take first point
+            
+            # Convert normalized coordinates to pixels
+            norm_x = point.get("x", 0)
+            norm_y = point.get("y", 0)
+            pixel_x = int(norm_x * width)
+            pixel_y = int(norm_y * height)
+            
+            logger.info(f"Found element at: ({pixel_x}, {pixel_y})")
+            
+            return {
+                "x": pixel_x,
+                "y": pixel_y,
+                "normalized_x": norm_x,
+                "normalized_y": norm_y,
+                "width": width,
+                "height": height,
+                "request_id": result.get("request_id", "")
+            }
+        else:
+            logger.warning(f"Moondream cloud could not find: {element_description}")
+            return None
+            
+    except Exception as e:
+        raise MoondreamError(f"Cloud element detection failed: {str(e)}")
+
+def _find_element_coordinates(element_description: str) -> Optional[Dict[str, int]]:
+    """Use Moondream to find element coordinates from description."""
+    global current_session_id
+    
+    if not current_session_id:
+        raise MoondreamError("No active browser session for screenshot")
+    
+    try:
+        # Take screenshot first
+        logger.info(f"Taking screenshot for element detection: {element_description}")
+        logger.info(f"Using Moondream mode: {MOONDREAM_MODE}")
+        
+        screenshot_response = _make_request("/browser/screenshot", {"sessionId": current_session_id})
+        
+        # Get screenshot data
+        screenshot_base64 = screenshot_response.get("screenshot_base64")
+        if not screenshot_base64:
+            raise MoondreamError("Failed to capture screenshot")
+        
+        # Decode base64 to get image
+        # Remove data URL prefix if present
+        if screenshot_base64.startswith('data:'):
+            screenshot_base64 = screenshot_base64.split(',')[1]
+        
+        image_bytes = base64.b64decode(screenshot_base64)
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        logger.info(f"Screenshot dimensions: {image.width}x{image.height}")
+        
+        # Use appropriate mode
+        if MOONDREAM_MODE == "cloud":
+            return _find_element_coordinates_cloud(element_description, image)
+        else:
+            return _find_element_coordinates_local(element_description, image, image_bytes)
+            
+    except Exception as e:
+        raise MoondreamError(f"Element detection failed: {str(e)}")
 
 def _take_screenshot_and_analyze(action_context: str) -> str:
     """Take screenshot and analyze with vision after any browser action."""
@@ -178,38 +341,24 @@ Final URL: {nav_response.get('currentUrl')}
     except Exception as e:
         return f"❌ Unexpected error: {str(e)}"
 
-@tool
-def click(x: int, y: int) -> str:
-    """Click at coordinates x,y on the page."""
+def _click_at_coordinates(x: int, y: int) -> None:
+    """Internal helper to click at specific coordinates."""
     global current_session_id
     
-    try:
-        if not current_session_id:
-            return "❌ No browser session. Use 'launch' first."
-        
-        logger.info(f"Clicking at coordinates: ({x}, {y})")
-        
-        # Perform click (using browser service API)
-        click_response = _make_request("/browser/click", {
-            "sessionId": current_session_id,
-            "x": x,
-            "y": y
-        })
-        
-        # Wait for any page changes
-        time.sleep(1)
-        
-        # Analyze what happened
-        analysis = _take_screenshot_and_analyze(f"Clicked at coordinates ({x}, {y})")
-        
-        return f"""✅ Click performed at ({x}, {y})
-
-{analysis}"""
-        
-    except BrowserError as e:
-        return f"❌ Click failed: {str(e)}"
-    except Exception as e:
-        return f"❌ Unexpected error: {str(e)}"
+    if not current_session_id:
+        raise BrowserError("No active browser session")
+    
+    logger.info(f"Clicking at coordinates: ({x}, {y})")
+    
+    # Perform click (using browser service API)
+    _make_request("/browser/click", {
+        "sessionId": current_session_id,
+        "x": x,
+        "y": y
+    })
+    
+    # Wait for any page changes
+    time.sleep(1)
 
 @tool
 def type_text(text: str) -> str:
@@ -323,6 +472,68 @@ def close() -> str:
         return f"❌ Unexpected error: {str(e)}"
 
 @tool
+def find_and_click(element_description: str) -> str:
+    """Find an element by description and click it using AI vision."""
+    global current_session_id
+    
+    try:
+        if not current_session_id:
+            return "❌ No browser session. Use 'launch' first."
+        
+        logger.info(f"Finding and clicking element: {element_description}")
+        
+        # Find element coordinates using Moondream
+        coords = _find_element_coordinates(element_description)
+        
+        if not coords:
+            return f"""❌ Could not find element: "{element_description}"
+
+💡 Tips for better element descriptions:
+• Be specific: "blue submit button" instead of just "button"
+• Include location: "search box at top of page"
+• Mention text: "button with text 'Login'"
+• Use visual features: "red circular icon"
+
+Try rephrasing your description or use 'look()' to see what's on the page."""
+        
+        # Click at the found coordinates using internal helper
+        _click_at_coordinates(coords['x'], coords['y'])
+        
+        # Analyze what happened
+        analysis = _take_screenshot_and_analyze(f"Found and clicked element: '{element_description}' at ({coords['x']}, {coords['y']})")
+        
+        return f"""✅ Successfully found and clicked: "{element_description}"
+
+📍 Element found at: ({coords['x']}, {coords['y']})
+📏 Screen size: {coords['width']}x{coords['height']}
+
+{analysis}"""
+        
+    except MoondreamError as e:
+        mode_tips = ""
+        if MOONDREAM_MODE == "cloud":
+            mode_tips = """💡 Make sure (Cloud Mode):
+• MOONDREAM_API_KEY environment variable is set
+• moondream package is installed: pip install moondream
+• You have internet connection for cloud API"""
+        else:
+            mode_tips = f"""💡 Make sure (Local Mode):
+• Moondream server is running at {MOONDREAM_LOCAL_URL}
+• The server is accessible and healthy"""
+        
+        return f"""❌ Vision detection failed: {str(e)}
+
+{mode_tips}
+• The browser has a page loaded
+• The element description is clear and specific"""
+        
+    except BrowserError as e:
+        return f"❌ Browser operation failed: {str(e)}"
+        
+    except Exception as e:
+        return f"❌ Unexpected error: {str(e)}"
+
+@tool
 def status() -> str:
     """Get current browser session status."""
     global current_session_id
@@ -346,7 +557,7 @@ def status() -> str:
         return f"❌ Unexpected error: {str(e)}"
 
 def check_health() -> Dict[str, Any]:
-    """Check if browser service and vision model are available."""
+    """Check if browser service, vision model, and Moondream are available."""
     try:
         # Check browser service
         browser_response = _make_request("/health", method="GET")
@@ -370,6 +581,30 @@ def check_health() -> Dict[str, Any]:
         vision_healthy = False
         vision_status = f"Vision model error: {str(e)}"
     
+    # Check Moondream service
+    if MOONDREAM_MODE == "cloud":
+        # Check cloud mode
+        if not MOONDREAM_API_KEY:
+            moondream_healthy = False
+            moondream_status = "Cloud mode: API key not set (MOONDREAM_API_KEY)"
+        elif md is None:
+            moondream_healthy = False
+            moondream_status = "Cloud mode: moondream package not installed"
+        else:
+            moondream_healthy = True
+            moondream_status = f"Cloud mode: Ready (API key configured)"
+    else:
+        # Check local mode
+        try:
+            moondream_response = requests.get(f"{MOONDREAM_LOCAL_URL}/health", timeout=5)
+            moondream_healthy = True
+            moondream_status = f"Local mode: Server responsive at {MOONDREAM_LOCAL_URL}"
+        except Exception as e:
+            moondream_healthy = False
+            moondream_status = f"Local mode: Server error at {MOONDREAM_LOCAL_URL} - {str(e)}"
+    
+    overall_healthy = browser_healthy and vision_healthy and moondream_healthy
+    
     return {
         "browser_service": {
             "healthy": browser_healthy,
@@ -379,6 +614,10 @@ def check_health() -> Dict[str, Any]:
             "healthy": vision_healthy,
             "status": vision_status
         },
-        "overall_healthy": browser_healthy and vision_healthy,
-        "message": "All systems ready" if (browser_healthy and vision_healthy) else "Some services have issues"
+        "moondream": {
+            "healthy": moondream_healthy,
+            "status": moondream_status
+        },
+        "overall_healthy": overall_healthy,
+        "message": "All systems ready" if overall_healthy else "Some services have issues"
     }

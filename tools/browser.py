@@ -250,66 +250,80 @@ def navigate_to_url(url: str) -> str:
         return f"❌ {error_msg}"
 
 @tool
-def take_marked_screenshot(options: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Take a screenshot with interactive elements highlighted.
-    
-    This advanced feature highlights clickable elements on the page,
-    making it easier for AI models to identify interactive components.
+def click(x: int, y: int) -> str:
+    """Click at specific coordinates on the page.
     
     Args:
-        options: Optional configuration for element marking
+        x: X coordinate to click
+        y: Y coordinate to click
         
     Returns:
-        Dictionary with marked screenshot and element data
+        Click result message
     """
     global current_session_id
     
     try:
         if not current_session_id:
-            return {
-                "type": "error",
-                "message": "❌ No active browser session. Please launch a browser first.",
-                "image": None,
-                "elements": []
-            }
+            return "❌ No active browser session. Please launch a browser first."
         
-        logger.info(f"Taking marked screenshot: {current_session_id}")
+        logger.info(f"Clicking at coordinates: ({x}, {y})")
         
-        # Make request to capture marked screenshot
-        response_data = _make_request("/browser/screenshot-marked", {
+        # Make request to click
+        response_data = _make_request("/browser/click", {
             "sessionId": current_session_id,
-            "options": options or {}
+            "x": x,
+            "y": y
         })
         
-        logger.info("Marked screenshot captured successfully")
-        
-        return {
-            "type": "marked_screenshot",
-            "message": "📸 Marked screenshot captured with interactive elements highlighted.",
-            "image": response_data.get("image"),
-            "elements": response_data.get("elements", []),
-            "session_id": response_data.get("sessionId"),
-            "timestamp": response_data.get("timestamp")
-        }
+        return f"""✅ Click performed successfully!
+• Coordinates: ({x}, {y})
+• Session: {response_data.get('sessionId')}"""
         
     except BrowserServiceError as e:
-        error_msg = f"Failed to capture marked screenshot: {str(e)}"
+        error_msg = f"Click at ({x}, {y}) failed: {str(e)}"
         logger.error(error_msg)
-        return {
-            "type": "error", 
-            "message": f"❌ {error_msg}",
-            "image": None,
-            "elements": []
-        }
+        return f"❌ {error_msg}"
     except Exception as e:
-        error_msg = f"Unexpected error capturing marked screenshot: {str(e)}"
+        error_msg = f"Unexpected click error: {str(e)}"
         logger.error(error_msg)
-        return {
-            "type": "error", 
-            "message": f"❌ {error_msg}",
-            "image": None,
-            "elements": []
-        }
+        return f"❌ {error_msg}"
+
+@tool
+def type_text(text: str) -> str:
+    """Type text into the currently focused element.
+    
+    Args:
+        text: Text to type
+        
+    Returns:
+        Type result message
+    """
+    global current_session_id
+    
+    try:
+        if not current_session_id:
+            return "❌ No active browser session. Please launch a browser first."
+        
+        logger.info(f"Typing text: {text}")
+        
+        # Make request to type
+        response_data = _make_request("/browser/type", {
+            "sessionId": current_session_id,
+            "text": text
+        })
+        
+        return f"""✅ Text typed successfully!
+• Text: "{text}"
+• Session: {response_data.get('sessionId')}"""
+        
+    except BrowserServiceError as e:
+        error_msg = f"Failed to type text: {str(e)}"
+        logger.error(error_msg)
+        return f"❌ {error_msg}"
+    except Exception as e:
+        error_msg = f"Unexpected typing error: {str(e)}"
+        logger.error(error_msg)
+        return f"❌ {error_msg}"
 
 def check_browser_service_health() -> Dict[str, Any]:
     """Check if the browser service is running and healthy."""

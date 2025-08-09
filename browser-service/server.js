@@ -296,6 +296,147 @@ app.post('/browser/close', async (req, res) => {
   }
 });
 
+// Click at coordinates
+app.post('/browser/click', async (req, res) => {
+  try {
+    const { sessionId, x, y } = req.body;
+    
+    if (!sessionId || x === undefined || y === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Session ID, x, and y coordinates are required'
+      });
+    }
+    
+    if (!activeSessions.has(sessionId)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    
+    console.log(`👆 Clicking at coordinates (${x}, ${y}) for session ${sessionId}`);
+    
+    // Perform click - pass coordinates as object
+    await click(sessionId, { x, y });
+    
+    console.log(`✅ Click performed successfully for session ${sessionId}`);
+    
+    res.json({
+      success: true,
+      sessionId: sessionId,
+      x: x,
+      y: y,
+      message: 'Click performed successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Click failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Click failed'
+    });
+  }
+});
+
+// Type text
+app.post('/browser/type', async (req, res) => {
+  try {
+    const { sessionId, text } = req.body;
+    
+    if (!sessionId || text === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Session ID and text are required'
+      });
+    }
+    
+    if (!activeSessions.has(sessionId)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    
+    console.log(`⌨️ Typing text "${text}" for session ${sessionId}`);
+    
+    // Type text
+    await type(sessionId, text);
+    
+    console.log(`✅ Text typed successfully for session ${sessionId}`);
+    
+    res.json({
+      success: true,
+      sessionId: sessionId,
+      text: text,
+      message: 'Text typed successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Typing failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Typing failed'
+    });
+  }
+});
+
+// Scroll page
+app.post('/browser/scroll', async (req, res) => {
+  try {
+    const { sessionId, direction = 'down', amount = 3 } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Session ID is required'
+      });
+    }
+    
+    if (!activeSessions.has(sessionId)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    
+    if (!['up', 'down'].includes(direction)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Direction must be "up" or "down"'
+      });
+    }
+    
+    console.log(`📜 Scrolling ${direction} by ${amount} steps for session ${sessionId}`);
+    
+    // Get browser service instance
+    const browser = BrowserService.getInstance();
+    
+    // Perform scroll using page.evaluate
+    await browser.scroll(sessionId, direction, amount);
+    
+    console.log(`✅ Scroll performed successfully for session ${sessionId}`);
+    
+    res.json({
+      success: true,
+      sessionId: sessionId,
+      direction: direction,
+      amount: amount,
+      message: 'Scroll performed successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Scroll failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Scroll failed'
+    });
+  }
+});
+
 // Close all browser sessions
 app.post('/browser/close-all', async (req, res) => {
   try {

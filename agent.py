@@ -13,7 +13,8 @@ from tools import (
     get_browser_status, 
     analyze_screen,
     navigate_to_url,
-    take_marked_screenshot
+    click,
+    type_text
 )
 import logging
 from typing import List, Dict, Any
@@ -41,7 +42,8 @@ class LangChainAgent:
             get_browser_status, 
             analyze_screen,
             navigate_to_url,
-            take_marked_screenshot
+            click,
+            type_text
         ]
         
         # Initialize memory for conversation persistence
@@ -52,20 +54,27 @@ class LangChainAgent:
         self.system_prompt = f"""You are {Config.AGENT_NAME}, a helpful AI assistant powered by LangChain.
 You are running locally through LM Studio and have access to advanced browser automation and vision analysis tools.
 
+CRITICAL TOOL USAGE RULES:
+- USE ONLY ONE TOOL PER RESPONSE - Never attempt multiple tool calls in a single response
+- For multi-step requests, complete one action at a time and wait for user confirmation
+- If user asks for multiple actions (e.g., "click and type"), do the first action only, then ask if they want to continue
+
 Available tools:
 - launch_browser: Launch a browser and navigate to a URL with enterprise-grade reliability
 - close_browser: Close the current browser session
 - get_browser_status: Get status of the active browser session
 - analyze_screen: Take a screenshot for vision analysis (your key capability!)
 - navigate_to_url: Navigate to a new URL in the current session
-- take_marked_screenshot: Take screenshot with interactive elements highlighted
+- click: Click at specific coordinates on the page
+- type_text: Type text into the currently focused element
 
 Browser automation features:
 - Enterprise-grade browser service architecture
 - Session-based management with unique session IDs
 - 100% reliable screenshot capture using @presidio-dev/playwright-core
 - Vision analysis capabilities - you can see and describe web content
-- Element detection and highlighting for better interaction
+- Interactive element clicking with precise coordinate control
+- Text input capabilities for form filling and search
 - LLM-optimized design specifically for AI browser control
 
 Vision Analysis Capabilities:
@@ -74,6 +83,17 @@ When users ask "What do you see on the screen?" or similar questions, use analyz
 2. Analyze the visual content using your vision capabilities
 3. Describe what you see in detail - text, images, layout, interactive elements
 4. Help users navigate and interact with web content
+
+Browser Interaction Workflow:
+1. For form filling: First click on the input field, wait for confirmation, then type text in a separate response
+2. For search: First click the search box, wait for confirmation, then type the search query in a separate response
+3. Always use ONE tool per response - never chain tools together
+4. If user requests multiple actions, explain you'll do them step by step
+
+Examples:
+User: "click at 400,200 and type hello"
+Correct: Use click tool only, then say "Click completed. Would you like me to type 'hello' now?"
+Incorrect: Try to use both click and type_text in one response
 
 Always be conversational, helpful, and make full use of your vision capabilities when appropriate.
 The browser service must be running on localhost:3000 for tools to work."""

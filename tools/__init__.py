@@ -6,7 +6,8 @@ from .browser import (
     get_browser_status, 
     analyze_screen,
     navigate_to_url,
-    take_marked_screenshot
+    click,
+    type_text
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "get_browser_status", 
     "analyze_screen",
     "navigate_to_url",
-    "take_marked_screenshot"
+    "click",
+    "type_text",
 ]
